@@ -35,6 +35,8 @@
 #include <ctime>
 #include <cstring>
 
+#include <omp.h>
+
 
 
 /**
@@ -106,69 +108,144 @@ void MsSequential(int *array, int *tmp, bool inplace, long begin, long end) {
 	}
 }
 
+void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cutoff, int depth) {
+	if (depth < cutoff || !(begin < (end - 1))) {
+		const long half = (begin + end) / 2;
+
+
+		#pragma omp task shared(array, tmp)
+		MsParallel(array, tmp, !inplace, begin, half, cutoff, depth + 1);
+
+		#pragma omp task shared(array, tmp)
+		MsParallel(array, tmp, !inplace, half, end, cutoff, depth + 1);
+
+		#pragma omp taskwait
+
+		if (inplace) {
+			MsMergeSequential(array, tmp, begin, half, half, end, begin);
+		} else {
+			MsMergeSequential(tmp, array, begin, half, half, end, begin);
+		}
+	} else {
+		MsSequential(array, tmp, inplace, begin, end);
+	}
+}
+
 
 /**
   * Serial MergeSort
   */
 // TODO: this function should create the parallel region
 // TODO: good point to compute a good depth level (cut-off)
-void MsSerial(int *array, int *tmp, const size_t size) {
 
-   // TODO: parallel version of MsSequential will receive one more parameter: 'depth' (used as cut-off)
-	MsSequential(array, tmp, true, 0, size);
+void parallel(const size_t stSize, const size_t cutoff){
+	struct timeval t1, t2;
+	double etime;
+
+	int *data = (int*) malloc(stSize * sizeof(int));
+	int *tmp = (int*) malloc(stSize * sizeof(int));
+	int *ref = (int*) malloc(stSize * sizeof(int));
+
+	printf("Initialization...\n");
+
+	srand(95);
+	for (size_t idx = 0; idx < stSize; ++idx){
+		data[idx] = (int) (stSize * (double(rand()) / RAND_MAX));
+	}
+	std::copy(data, data + stSize, ref);
+
+	double dSize = (stSize * sizeof(int)) / 1024 / 1024;
+	printf("Sorting %zu elements of type int (%f MiB)...\n", stSize, dSize);
+
+
+	omp_set_num_threads(pow(2,cutoff));
+	int max_thread = omp_get_max_threads();
+	std::cout << max_thread << std::endl;
+
+
+	gettimeofday(&t1, NULL);
+	MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+	gettimeofday(&t2, NULL);
+	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
+	etime = etime / 1000;
+
+	printf("done, took %f sec. Verification...", etime);
+	if (isSorted(ref, data, stSize)) {
+		printf(" successful.\n");
+	}
+	else {
+		printf(" FAILED.\n");
+	}
+
+
+	free(data);
+	free(tmp);
+	free(ref);
+
 }
 
+
+void serial(const size_t stSize){
+
+	struct timeval t1, t2;
+	double etime;
+
+	int *data = (int*) malloc(stSize * sizeof(int));
+	int *tmp = (int*) malloc(stSize * sizeof(int));
+	int *ref = (int*) malloc(stSize * sizeof(int));
+
+
+	
+	for (size_t idx = 0; idx < stSize; ++idx){
+		data[idx] = (int) (stSize * (double(rand()) / RAND_MAX));
+	}
+	std::copy(data, data + stSize, ref);
+
+	gettimeofday(&t1, NULL);
+	MsSequential(data, tmp, true, 0, stSize);
+	gettimeofday(&t2, NULL);
+	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
+	etime = etime / 1000;
+
+	printf("done, took %f sec. Verification...", etime);
+	if (isSorted(ref, data, stSize)) {
+		printf(" successful.\n");
+	}
+	else {
+		printf(" FAILED.\n");
+	}
+
+
+	free(data);
+	free(tmp);
+	free(ref);
+	
+}
 
 /** 
   * @brief program entry point
   */
 int main(int argc, char* argv[]) {
 	// variables to measure the elapsed time
-	struct timeval t1, t2;
-	double etime;
+
 
 	// expect one command line arguments: array size
-	if (argc != 2) {
+	if (argc < 3) {
 		printf("Usage: MergeSort.exe <array size> \n");
 		printf("\n");
 		return EXIT_FAILURE;
 	}
-	else {
-		const size_t stSize = strtol(argv[1], NULL, 10);
-		int *data = (int*) malloc(stSize * sizeof(int));
-		int *tmp = (int*) malloc(stSize * sizeof(int));
-		int *ref = (int*) malloc(stSize * sizeof(int));
 
-		printf("Initialization...\n");
 
-		srand(95);
-		for (size_t idx = 0; idx < stSize; ++idx){
-			data[idx] = (int) (stSize * (double(rand()) / RAND_MAX));
-		}
-		std::copy(data, data + stSize, ref);
+	parallel(static_cast<int>(atoi(argv[1])), static_cast<int>(atoi(argv[2])));
+	serial(static_cast<int>(atoi(argv[1])));
 
-		double dSize = (stSize * sizeof(int)) / 1024 / 1024;
-		printf("Sorting %zu elements of type int (%f MiB)...\n", stSize, dSize);
 
-		gettimeofday(&t1, NULL);
-		MsSerial(data, tmp, stSize);
-		gettimeofday(&t2, NULL);
+//-----------------------------------------------------------------------
 
-		etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
-		etime = etime / 1000;
+//---------------------------------
 
-		printf("done, took %f sec. Verification...", etime);
-		if (isSorted(ref, data, stSize)) {
-			printf(" successful.\n");
-		}
-		else {
-			printf(" FAILED.\n");
-		}
 
-		free(data);
-		free(tmp);
-		free(ref);
-	}
 
-	return EXIT_SUCCESS;
+
 }

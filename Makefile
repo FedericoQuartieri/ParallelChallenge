@@ -1,20 +1,13 @@
-BIN_DIR=../bin
-PROGRAM=$(BIN_DIR)/mergesort-co
+FLAGS = -I ${mkEigenInc} -O3 -fopenmp # -I ${mkLisInc} -L${mkLisLib} -llis
+GCC = g++
+MTX_ARGS = 12345678 4
 
-CC=g++
-CFLAGS=-O3 -fopenmp
-LDFLAGS=-fopenmp
+all: execlean main.exe
+	./main.exe ${MTX_ARGS}
 
-all: $(PROGRAM) 
+%.exe: %.cpp
+	@$(GCC) $(FLAGS) $< -o $@
+	
 
-$(PROGRAM): mergesort.cpp
-	$(CC) $(CFLAGS) $(VERBOSE) -o $@ $^ $(LDFLAGS)
-
-$(BIN_DIR): 
-	mkdir $@
-
-clean:
-	rm -rf $(PROGRAM) *.o
-
-wipe: clean
-	rm -rf *.out *.err
+execlean:
+	@rm -f **.exe
