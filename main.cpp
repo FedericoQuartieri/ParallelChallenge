@@ -413,32 +413,57 @@ void performInterpolation() {
     serial_interpolated_file.close();
 }
 
-/** 
- * @brief Program entry point.
- */
-int main(int argc, char* argv[]) {
+void createGraphSize(int cutoff, int max_possible_size, int h, std::string s){
+// Create a gnuplot script to generate a plot for this cutoff
+    std::stringstream ss1;
+    ss1 << "tempi_size_" << cutoff << ".png"; 
+    std::ofstream gnuplot_file("plot_commands.gp");
+    gnuplot_file << "set terminal png size 800,600\n";
+    gnuplot_file << "set output '" << ss1.str() << "'\n";
+    gnuplot_file << "set title 'Comparison of Serial vs Parallel Times with cutoff "<< cutoff << std::endl;
+    gnuplot_file << "set xlabel 'Array Size'\n";
+    gnuplot_file << "set ylabel 'Time (s)'\n";
+    gnuplot_file << "set grid\n";
+    gnuplot_file << "set xrange [" << max_possible_size/h << ":*]\n";
+    gnuplot_file << "set yrange [0:*]\n";
+    gnuplot_file << "set datafile separator ','\n";
+    gnuplot_file << "plot '" << s << "' using 1:2 with lines title 'Serial', '" << s << "' using 1:3 with lines title 'Parallel'\n";
+    gnuplot_file.close();
 
-    if (argc < 5) {
-        printf("Usage: MergeSort.exe <array size> <max cutoff> <h> <divider_for_avg>\n");
-        printf("\n");
-        return EXIT_FAILURE;
-    }
+    // Execute the gnuplot command to generate the plot
+    system("gnuplot plot_commands.gp");
 
-    // Parse command-line arguments
-    int max_possible_size = atoi(argv[1]); // Maximum array size
-    int max_possible_cutoff = atoi(argv[2]); // Maximum cutoff depth
-    int h = atoi(argv[3]); // Used to calculate the array size increments
-    int divider_for_avg = atoi(argv[4]); // Number of runs to average the time
+    std::cout << "Plot saved\n\n";
+}
+
+void createGraphCutoff(){
+    // Create a gnuplot script to generate a plot of time vs cutoff
+    std::ofstream gnuplot_file("plot_commands.gp");
+    gnuplot_file << "set terminal png size 800,600\n";
+    gnuplot_file << "set output 'tempi_cutoff_max_size.png'\n";
+    gnuplot_file << "set title 'Comparison of Serial vs Parallel Times'\n";
+    gnuplot_file << "set xlabel 'Cutoff'\n";
+    gnuplot_file << "set ylabel 'Time (s)'\n";
+    gnuplot_file << "set grid\n";
+    gnuplot_file << "set xrange [0:*]\n";
+    gnuplot_file << "set yrange [0:*]\n";
+    gnuplot_file << "set datafile separator ','\n";
+    gnuplot_file << "plot 'tempo_cutoff.csv' using 1:2 with lines title 'Serial', 'tempo_cutoff.csv' using 1:3 with lines title 'Parallel'\n";
+    gnuplot_file.close();
+}
+
+
+void executeCutoffSizes(int max_possible_size, int max_possible_cutoff, int h, int divider_for_avg){
+    
+    double max_speedup = 0; // Variable to store the maximum speedup achieved
+    int max_cutoff = -1; // Variable to store the cutoff that gives maximum speedup
+    int max_size = 0; // Variable to store the array size that gives maximum speedup
 
     // Create a vector to store different array sizes to test
     std::vector<int> sizes;
     for (int i = max_possible_size/h; i <= max_possible_size; i += max_possible_size/h) {
         sizes.push_back(i); // Add sizes from max_size/h up to max_size, incrementing by max_size/h
     }
-
-    double max_speedup = 0; // Variable to store the maximum speedup achieved
-    int max_cutoff = -1; // Variable to store the cutoff that gives maximum speedup
-    int max_size = 0; // Variable to store the array size that gives maximum speedup
 
     // Open a CSV file to store 3D data (cutoff, array size, times)
     std::ofstream file_3d("tempi_3d.csv");
@@ -494,28 +519,27 @@ int main(int argc, char* argv[]) {
 
         file.close(); // Close the CSV file for this cutoff
 
-        // Create a gnuplot script to generate a plot for this cutoff
-        std::stringstream ss1;
-        ss1 << "tempi_size_" << cutoff << ".png"; 
-        std::ofstream gnuplot_file("plot_commands.gp");
-        gnuplot_file << "set terminal png size 800,600\n";
-        gnuplot_file << "set output '" << ss1.str() << "'\n";
-        gnuplot_file << "set title 'Comparison of Serial vs Parallel Times'\n";
-        gnuplot_file << "set xlabel 'Array Size'\n";
-        gnuplot_file << "set ylabel 'Time (s)'\n";
-        gnuplot_file << "set grid\n";
-        gnuplot_file << "set xrange [" << max_possible_size/h << ":*]\n";
-        gnuplot_file << "set yrange [0:*]\n";
-        gnuplot_file << "set datafile separator ','\n";
-        gnuplot_file << "plot '" << s << "' using 1:2 with lines title 'Serial', '" << s << "' using 1:3 with lines title 'Parallel'\n";
-        gnuplot_file.close();
 
-        // Execute the gnuplot command to generate the plot
-        system("gnuplot plot_commands.gp");
-
-        std::cout << "Plot saved\n\n";
+        createGraphSize(cutoff, max_possible_size, h, s);
+        
         std::cout << "---------------------------------------------\nNew cutoff\n---------------------------------------------\n\n";
     }
+
+    file_3d.close();
+
+    
+    double dSize = (max_size * sizeof(int)) / 1024 / 1024;
+    std::cout << "Max cutoff: " << max_cutoff << " with speedup: " << max_speedup << " and size: " << dSize << " MiB (" << max_size << " elements)" << std::endl;
+
+
+    // Call the interpolation function
+    performInterpolation();
+    system("python3 graph.py");
+
+}
+
+
+void executeCutoff(int max_possible_size, int max_possible_cutoff, int h, int divider_for_avg){
 
     // Now test the effect of different cutoff values on a fixed maximum array size
     std::ofstream file("tempo_cutoff.csv");
@@ -542,46 +566,39 @@ int main(int argc, char* argv[]) {
         
         std::cout << "Speedup with cutoff " << cutoff << " : " << speedup << std::endl << std::endl;
 
-        // Check if this is the maximum speedup achieved so far
-        if (speedup > max_speedup){
-            max_speedup = speedup;
-            max_cutoff = cutoff;
-        }
         
         // Print and save the results
         std::cout << "Array size: " << max_possible_size << " | Serial: " << serial_time << " s | Parallel: " << parallel_time << " s\n\n\n";
         file << cutoff << "," << serial_time << "," << parallel_time << "\n";
     }
 
-    file.close(); // Close the CSV file
+    file.close();
 
-    // Create a gnuplot script to generate a plot of time vs cutoff
-    std::ofstream gnuplot_file("plot_commands.gp");
-    gnuplot_file << "set terminal png size 800,600\n";
-    gnuplot_file << "set output 'tempi_cutoff_max_size.png'\n";
-    gnuplot_file << "set title 'Comparison of Serial vs Parallel Times'\n";
-    gnuplot_file << "set xlabel 'Cutoff'\n";
-    gnuplot_file << "set ylabel 'Time (s)'\n";
-    gnuplot_file << "set grid\n";
-    gnuplot_file << "set xrange [0:*]\n";
-    gnuplot_file << "set yrange [0:*]\n";
-    gnuplot_file << "set datafile separator ','\n";
-    gnuplot_file << "plot 'tempo_cutoff.csv' using 1:2 with lines title 'Serial', 'tempo_cutoff.csv' using 1:3 with lines title 'Parallel'\n";
-    gnuplot_file.close();
-
-    double dSize = (max_size * sizeof(int)) / 1024 / 1024;
-
-    // Print the maximum speedup achieved and the corresponding cutoff and array size
-    std::cout << "Max cutoff: " << max_cutoff << " with speedup: " << max_speedup << " and size: " << dSize << " MiB (" << max_size << " elements)" << std::endl;
-
+    createGraphCutoff();
     // Execute the gnuplot command to generate the plot
     system("gnuplot plot_commands.gp");
+}
 
-    // Close the 3D data CSV file
-    file_3d.close();
 
-    // Call the interpolation function
-    performInterpolation();
-    system("python graph.py");
+/** 
+ * @brief Program entry point.
+ */
+int main(int argc, char* argv[]) {
+
+    if (argc < 5) {
+        printf("Usage: MergeSort.exe <array size> <max cutoff> <h> <divider_for_avg>\n");
+        printf("\n");
+        return EXIT_FAILURE;
+    }
+
+    // Parse command-line arguments
+    int max_possible_size = atoi(argv[1]); // Maximum array size
+    int max_possible_cutoff = atoi(argv[2]); // Maximum cutoff depth
+    int h = atoi(argv[3]); // Used to calculate the array size increments
+    int divider_for_avg = atoi(argv[4]); // Number of runs to average the time
+
+    executeCutoff(max_possible_size, max_possible_cutoff, h, divider_for_avg);
+    executeCutoffSizes(max_possible_size, max_possible_cutoff, h, divider_for_avg);
+
     return 0;
 }

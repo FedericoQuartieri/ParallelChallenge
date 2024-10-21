@@ -1,7 +1,8 @@
-FLAGS = -O3 -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp# -I ${mkLisInc} -L${mkLisLib} -llis
-GCC = clang++
+FLAGS = -O3 -fopenmp # -I ${mkLisInc} -L${mkLisLib} -llis
+FLAGS2 = -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp
+GCC = g++
 #######max_size;max_cutoff;passo;diveder for avg
-MTX_ARGS = 1000000 15 10 8
+MTX_ARGS = 1009000 12 13 8
 
 all: allclean main.exe
 	./main.exe ${MTX_ARGS}
