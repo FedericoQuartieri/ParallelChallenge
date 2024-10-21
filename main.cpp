@@ -112,14 +112,19 @@ void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cu
 	if (depth < cutoff || !(begin < (end - 1))) {
 		const long half = (begin + end) / 2;
 
+		#pragma omp parallel num_threads(2)
+		{
+			#pragma omp single
+			{
+				#pragma omp task shared(array, tmp)
+				MsParallel(array, tmp, !inplace, begin, half, cutoff, depth + 1);
 
-		#pragma omp task shared(array, tmp)
-		MsParallel(array, tmp, !inplace, begin, half, cutoff, depth + 1);
+				#pragma omp task shared(array, tmp)
+				MsParallel(array, tmp, !inplace, half, end, cutoff, depth + 1);
 
-		#pragma omp task shared(array, tmp)
-		MsParallel(array, tmp, !inplace, half, end, cutoff, depth + 1);
-
-		#pragma omp taskwait
+				#pragma omp taskwait
+			}
+		}
 
 		if (inplace) {
 			MsMergeSequential(array, tmp, begin, half, half, end, begin);
@@ -138,7 +143,7 @@ void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cu
 // TODO: this function should create the parallel region
 // TODO: good point to compute a good depth level (cut-off)
 
-void parallel(const size_t stSize, const size_t cutoff){
+double parallel(const size_t stSize, const size_t cutoff){
 	struct timeval t1, t2;
 	double etime;
 
@@ -160,7 +165,7 @@ void parallel(const size_t stSize, const size_t cutoff){
 
 	omp_set_num_threads(pow(2,cutoff));
 	int max_thread = omp_get_max_threads();
-	std::cout << max_thread << std::endl;
+	std::cout << "number of threads: " << max_thread << std::endl;
 
 
 	gettimeofday(&t1, NULL);
@@ -169,7 +174,7 @@ void parallel(const size_t stSize, const size_t cutoff){
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
 	etime = etime / 1000;
 
-	printf("done, took %f sec. Verification...", etime);
+	printf("Parallel done, took %f sec. Verification...", etime);
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
@@ -182,10 +187,12 @@ void parallel(const size_t stSize, const size_t cutoff){
 	free(tmp);
 	free(ref);
 
+	return etime;
+
 }
 
 
-void serial(const size_t stSize){
+double serial(const size_t stSize){
 
 	struct timeval t1, t2;
 	double etime;
@@ -207,7 +214,7 @@ void serial(const size_t stSize){
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
 	etime = etime / 1000;
 
-	printf("done, took %f sec. Verification...", etime);
+	printf("Sequential done, took %f sec. Verification...", etime);
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
@@ -220,6 +227,8 @@ void serial(const size_t stSize){
 	free(tmp);
 	free(ref);
 	
+
+	return etime;
 }
 
 /** 
@@ -237,8 +246,22 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	parallel(static_cast<int>(atoi(argv[1])), static_cast<int>(atoi(argv[2])));
-	serial(static_cast<int>(atoi(argv[1])));
+	double max = 0;
+	int max_cutoff = -1;
+
+	for (int cutoff = 0; cutoff <  static_cast<int>(atoi(argv[2])); cutoff++) {
+		double ptime = parallel(static_cast<int>(atoi(argv[1])), cutoff);
+		double stime = serial(static_cast<int>(atoi(argv[1])));
+		double speedup = stime/ptime;
+		if (speedup > max){
+			max = speedup;
+			max_cutoff = cutoff;
+		}
+		std::cout << "speedup with cutoff " << cutoff << " : " << stime/ptime << std::endl<<std::endl;
+	}
+
+	std::cout << "max cutoff: " << max_cutoff << "   with speedup: " << max << std::endl;
+
 
 
 //-----------------------------------------------------------------------
