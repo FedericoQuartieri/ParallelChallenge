@@ -36,6 +36,7 @@
 #include <cstring>
 
 #include <omp.h>
+#include <chrono>
 
 
 
@@ -109,7 +110,7 @@ void MsSequential(int *array, int *tmp, bool inplace, long begin, long end) {
 }
 
 void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cutoff, int depth) {
-	if (depth < cutoff || !(begin < (end - 1))) {
+	if (depth < cutoff) {
 		const long half = (begin + end) / 2;
 
 
@@ -158,18 +159,30 @@ void parallel(const size_t stSize, const size_t cutoff){
 	printf("Sorting %zu elements of type int (%f MiB)...\n", stSize, dSize);
 
 
-	omp_set_num_threads(pow(2,cutoff));
-	int max_thread = omp_get_max_threads();
-	std::cout << max_thread << std::endl;
+	omp_set_num_threads(100);
+	//int max_thread = omp_get_max_threads();
+	//std::cout << max_thread << std::endl;
 
+	auto start = std::chrono::high_resolution_clock::now();
+	#pragma omp parallel
+		{
+			#pragma omp single
+			{
+				MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+			}
+		}
 
-	gettimeofday(&t1, NULL);
-	MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	
+
+	/*gettimeofday(&t1, NULL);
+	
 	gettimeofday(&t2, NULL);
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
-	etime = etime / 1000;
+	etime = etime / 1000;*/
 
-	printf("done, took %f sec. Verification...", etime);
+	printf("done, took %f sec. Verification...", elapsed.count());
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
@@ -201,13 +214,19 @@ void serial(const size_t stSize){
 	}
 	std::copy(data, data + stSize, ref);
 
-	gettimeofday(&t1, NULL);
+
+	auto start = std::chrono::high_resolution_clock::now();
+		MsSequential(data, tmp, true, 0, stSize);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+
+	/*gettimeofday(&t1, NULL);
 	MsSequential(data, tmp, true, 0, stSize);
 	gettimeofday(&t2, NULL);
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
-	etime = etime / 1000;
+	etime = etime / 1000;*/
 
-	printf("done, took %f sec. Verification...", etime);
+	printf("done, took %f sec. Verification...", elapsed.count());
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
