@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <algorithm>
-
+#include <fstream>
 #include <cstdlib>
 #include <cstdio>
 
@@ -37,6 +37,7 @@
 
 #include <omp.h>
 #include <chrono>
+#include <cstdlib> // Per eseguire comandi di sistema come GNUplot
 
 
 
@@ -172,6 +173,7 @@ void parallel(const size_t stSize, const size_t cutoff){
 			}
 		}
 
+
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed = end - start;
 	
@@ -256,9 +258,57 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	parallel(static_cast<int>(atoi(argv[1])), static_cast<int>(atoi(argv[2])));
-	serial(static_cast<int>(atoi(argv[1])));
+	//parallel(static_cast<int>(atoi(argv[1])), static_cast<int>(atoi(argv[2])));
+	//serial(static_cast<int>(atoi(argv[1])));
 
+
+	std::ofstream file("tempi.csv");
+    file << "Array Size,Serial Time,Parallel Time\n";
+
+    // Prova con array di dimensioni variabili
+    //std::vector<int> sizes = {1000, 10000, 100000, 500000, 1000000}; // Puoi modificare le dimensioni a tuo piacere
+	std::vector<int> sizes;
+    for (int i = 1; i <= 1000000; i+=100000) {
+        sizes.push_back(i);
+    }
+    for (int size : sizes) {
+        
+
+        // Misura il tempo per l'algoritmo seriale
+        auto start = std::chrono::high_resolution_clock::now();
+        serial(size);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> serial_time = end - start;
+
+        // Misura il tempo per l'algoritmo parallelo
+        start = std::chrono::high_resolution_clock::now();
+        parallel(size, static_cast<int>(atoi(argv[2])));
+        end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> parallel_time = end - start;
+
+        // Stampa e salva i risultati
+        std::cout << "Array size: " << size << " | Serial: " << serial_time.count() << " s | Parallel: " << parallel_time.count() << " s\n";
+        file << size << "," << serial_time.count() << "," << parallel_time.count() << "\n";
+    }
+
+    file.close();
+	 // Chiama gnuplot per creare il grafico
+    std::ofstream gnuplot_file("plot_commands.gp");
+    gnuplot_file << "set terminal png size 800,600\n";
+    gnuplot_file << "set output 'tempi_grafico.png'\n";
+    gnuplot_file << "set title 'Confronto Tempi Seriali vs Paralleli'\n";
+    gnuplot_file << "set xlabel 'Dimensione Array'\n";
+    gnuplot_file << "set ylabel 'Tempo (s)'\n";
+    gnuplot_file << "set grid\n";
+    gnuplot_file << "plot 'tempi.csv' using 1:2 with lines title 'Seriale', 'tempi.csv' using 1:3 with lines title 'Parallelo'\n";
+    gnuplot_file.close();
+
+    // Esegui il comando gnuplot
+    system("gnuplot plot_commands.gp");
+
+    std::cout << "Grafico salvato come 'tempi_grafico.png'\n";
+
+    return 0;
 
 //-----------------------------------------------------------------------
 
