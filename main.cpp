@@ -162,14 +162,16 @@ double parallel(const size_t stSize, const size_t cutoff){
 	double dSize = (stSize * sizeof(int)) / 1024 / 1024;
 	printf("Sorting %zu elements of type int (%f MiB)...\n", stSize, dSize);
 
-
+	omp_set_max_active_levels(cutoff+1);
 	omp_set_num_threads(pow(2,cutoff));
 	int max_thread = omp_get_max_threads();
 	std::cout << "number of threads: " << max_thread << std::endl;
-
+	std::cout << "number of levels: " << omp_get_max_active_levels() << std::endl;
+	std::cout << "number of cores: " << omp_get_num_procs() << std::endl;
 
 	gettimeofday(&t1, NULL);
 	MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+	//std::sort(data, data + stSize);
 	gettimeofday(&t2, NULL);
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
 	etime = etime / 1000;
@@ -248,8 +250,9 @@ int main(int argc, char* argv[]) {
 
 	double max = 0;
 	int max_cutoff = -1;
-
-	for (int cutoff = 0; cutoff <  static_cast<int>(atoi(argv[2])); cutoff++) {
+	//int cutoff = static_cast<int>(atoi(argv[2]))-1;
+	int cutoff = 0;
+	for (cutoff; cutoff <  static_cast<int>(atoi(argv[2])); cutoff++) {
 		double ptime = parallel(static_cast<int>(atoi(argv[1])), cutoff);
 		double stime = serial(static_cast<int>(atoi(argv[1])));
 		double speedup = stime/ptime;
