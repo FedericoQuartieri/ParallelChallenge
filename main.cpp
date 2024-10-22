@@ -115,13 +115,19 @@ void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cu
 		const long half = (begin + end) / 2;
 
 
-		#pragma omp task shared(array, tmp)
-		MsParallel(array, tmp, !inplace, begin, half, cutoff, depth + 1);
+		#pragma omp parallel num_threads(2)
+		{
+			#pragma omp single
+			{
+				#pragma omp task shared(array, tmp)
+				MsParallel(array, tmp, !inplace, begin, half, cutoff, depth + 1);
 
-		#pragma omp task shared(array, tmp)
-		MsParallel(array, tmp, !inplace, half, end, cutoff, depth + 1);
+				#pragma omp task shared(array, tmp)
+				MsParallel(array, tmp, !inplace, half, end, cutoff, depth + 1);
 
-		#pragma omp taskwait
+				#pragma omp taskwait
+			}
+		}
 
 		if (inplace) {
 			MsMergeSequential(array, tmp, begin, half, half, end, begin);
@@ -160,18 +166,20 @@ void parallel(const size_t stSize, const size_t cutoff){
 	printf("Sorting %zu elements of type int (%f MiB)...\n", stSize, dSize);
 
 
-	omp_set_num_threads(100);
+	omp_set_max_active_levels(cutoff+1);
+	omp_set_num_threads(pow(2,cutoff));
 	//int max_thread = omp_get_max_threads();
 	//std::cout << max_thread << std::endl;
-
+	int max_thread = omp_get_max_threads();
+	std::cout << "number of threads: " << max_thread << std::endl;
+	std::cout << "number of levels: " << omp_get_max_active_levels() << std::endl;
+	std::cout << "number of cores: " << omp_get_num_procs() << std::endl;
 	auto start = std::chrono::high_resolution_clock::now();
-	#pragma omp parallel
-		{
-			#pragma omp single
-			{
-				MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
-			}
-		}
+	
+			
+			
+						MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+		
 
 
 	auto end = std::chrono::high_resolution_clock::now();
@@ -262,13 +270,18 @@ int main(int argc, char* argv[]) {
 	//serial(static_cast<int>(atoi(argv[1])));
 
 
+
+
+
+
+
 	std::ofstream file("tempi.csv");
     file << "Array Size,Serial Time,Parallel Time\n";
 
     // Prova con array di dimensioni variabili
     //std::vector<int> sizes = {1000, 10000, 100000, 500000, 1000000}; // Puoi modificare le dimensioni a tuo piacere
 	std::vector<int> sizes;
-    for (int i = 1; i <= 1000000; i+=100000) {
+    for (int i = 1; i <= 10000000; i+=1000000) {
         sizes.push_back(i);
     }
     for (int size : sizes) {
@@ -300,6 +313,9 @@ int main(int argc, char* argv[]) {
     gnuplot_file << "set xlabel 'Dimensione Array'\n";
     gnuplot_file << "set ylabel 'Tempo (s)'\n";
     gnuplot_file << "set grid\n";
+	gnuplot_file << "set xrange [0:*]\n";
+	gnuplot_file << "set yrange [0:*]\n";
+	gnuplot_file << "set datafile separator ','\n";
     gnuplot_file << "plot 'tempi.csv' using 1:2 with lines title 'Seriale', 'tempi.csv' using 1:3 with lines title 'Parallelo'\n";
     gnuplot_file.close();
 

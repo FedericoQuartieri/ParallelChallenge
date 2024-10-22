@@ -4,4 +4,7 @@ set title 'Confronto Tempi Seriali vs Paralleli'
 set xlabel 'Dimensione Array'
 set ylabel 'Tempo (s)'
 set grid
+set xrange [0:*]
+set yrange [0:*]
+set datafile separator ','
 plot 'tempi.csv' using 1:2 with lines title 'Seriale', 'tempi.csv' using 1:3 with lines title 'Parallelo'

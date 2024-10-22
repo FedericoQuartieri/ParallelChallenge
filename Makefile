@@ -1,6 +1,6 @@
 FLAGS = -I ${mkEigenInc} -O3 -fopenmp # -I ${mkLisInc} -L${mkLisLib} -llis
 GCC = g++
-MTX_ARGS = 83456566 3
+MTX_ARGS = 83456566 4
 
 all: execlean main.exe
 	./main.exe ${MTX_ARGS}
