@@ -1,4 +1,4 @@
-FLAGS = -I ${mkEigenInc} -O3 -fopenmp # -I ${mkLisInc} -L${mkLisLib} -llis
+FLAGS = -O3 -fopenmp # -I ${mkLisInc} -L${mkLisLib} -llis
 GCC = g++
 MTX_ARGS = 83456566 4
 

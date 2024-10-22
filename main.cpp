@@ -146,7 +146,7 @@ void MsParallel(int *array, int *tmp, bool inplace, long begin, long end, int cu
 // TODO: this function should create the parallel region
 // TODO: good point to compute a good depth level (cut-off)
 
-void parallel(const size_t stSize, const size_t cutoff){
+double parallel(const size_t stSize, const size_t cutoff){
 	struct timeval t1, t2;
 	double etime;
 
@@ -174,25 +174,15 @@ void parallel(const size_t stSize, const size_t cutoff){
 	std::cout << "number of threads: " << max_thread << std::endl;
 	std::cout << "number of levels: " << omp_get_max_active_levels() << std::endl;
 	std::cout << "number of cores: " << omp_get_num_procs() << std::endl;
-	auto start = std::chrono::high_resolution_clock::now();
-	
-			
-			
-						MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
-		
 
-
-	auto end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> elapsed = end - start;
-	
-
-	/*gettimeofday(&t1, NULL);
-	
+	gettimeofday(&t1, NULL);
+	MsParallel(data, tmp, true, 0, stSize, cutoff, 0);
+	//std::sort(data, data + stSize);
 	gettimeofday(&t2, NULL);
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
 	etime = etime / 1000;*/
 
-	printf("done, took %f sec. Verification...", elapsed.count());
+	printf("Parallel done, took %f sec. Verification...", etime);
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
@@ -205,10 +195,12 @@ void parallel(const size_t stSize, const size_t cutoff){
 	free(tmp);
 	free(ref);
 
+	return etime;
+
 }
 
 
-void serial(const size_t stSize){
+double serial(const size_t stSize){
 
 	struct timeval t1, t2;
 	double etime;
@@ -236,7 +228,7 @@ void serial(const size_t stSize){
 	etime = (t2.tv_sec - t1.tv_sec) * 1000 + (t2.tv_usec - t1.tv_usec) / 1000;
 	etime = etime / 1000;*/
 
-	printf("done, took %f sec. Verification...", elapsed.count());
+	printf("Sequential done, took %f sec. Verification...", etime);
 	if (isSorted(ref, data, stSize)) {
 		printf(" successful.\n");
 	}
@@ -249,6 +241,8 @@ void serial(const size_t stSize){
 	free(tmp);
 	free(ref);
 	
+
+	return etime;
 }
 
 /** 
@@ -266,9 +260,80 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	//parallel(static_cast<int>(atoi(argv[1])), static_cast<int>(atoi(argv[2])));
-	//serial(static_cast<int>(atoi(argv[1])));
+	double max = 0;
+	int max_cutoff = -1;
+	//int cutoff = static_cast<int>(atoi(argv[2]))-1;
+	int cutoff = 0;
+	for (cutoff; cutoff <  static_cast<int>(atoi(argv[2])); cutoff++) {
+		double ptime = parallel(static_cast<int>(atoi(argv[1])), cutoff);
+		double stime = serial(static_cast<int>(atoi(argv[1])));
+		double speedup = stime/ptime;
+		if (speedup > max){
+			max = speedup;
+			max_cutoff = cutoff;
+		}
+		std::cout << "speedup with cutoff " << cutoff << " : " << stime/ptime << std::endl<<std::endl;
+	}
 
+	std::cout << "max cutoff: " << max_cutoff << "   with speedup: " << max << std::endl;
+
+
+
+
+
+
+
+
+	std::ofstream file("tempi.csv");
+    file << "Array Size,Serial Time,Parallel Time\n";
+
+    // Prova con array di dimensioni variabili
+    //std::vector<int> sizes = {1000, 10000, 100000, 500000, 1000000}; // Puoi modificare le dimensioni a tuo piacere
+	std::vector<int> sizes;
+    for (int i = 1; i <= 10000000; i+=1000000) {
+        sizes.push_back(i);
+    }
+    for (int size : sizes) {
+        
+
+        // Misura il tempo per l'algoritmo seriale
+        auto start = std::chrono::high_resolution_clock::now();
+        serial(size);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> serial_time = end - start;
+
+        // Misura il tempo per l'algoritmo parallelo
+        start = std::chrono::high_resolution_clock::now();
+        parallel(size, static_cast<int>(atoi(argv[2])));
+        end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> parallel_time = end - start;
+
+        // Stampa e salva i risultati
+        std::cout << "Array size: " << size << " | Serial: " << serial_time.count() << " s | Parallel: " << parallel_time.count() << " s\n";
+        file << size << "," << serial_time.count() << "," << parallel_time.count() << "\n";
+    }
+
+    file.close();
+	 // Chiama gnuplot per creare il grafico
+    std::ofstream gnuplot_file("plot_commands.gp");
+    gnuplot_file << "set terminal png size 800,600\n";
+    gnuplot_file << "set output 'tempi_grafico.png'\n";
+    gnuplot_file << "set title 'Confronto Tempi Seriali vs Paralleli'\n";
+    gnuplot_file << "set xlabel 'Dimensione Array'\n";
+    gnuplot_file << "set ylabel 'Tempo (s)'\n";
+    gnuplot_file << "set grid\n";
+	gnuplot_file << "set xrange [0:*]\n";
+	gnuplot_file << "set yrange [0:*]\n";
+	gnuplot_file << "set datafile separator ','\n";
+    gnuplot_file << "plot 'tempi.csv' using 1:2 with lines title 'Seriale', 'tempi.csv' using 1:3 with lines title 'Parallelo'\n";
+    gnuplot_file.close();
+
+    // Esegui il comando gnuplot
+    system("gnuplot plot_commands.gp");
+
+    std::cout << "Grafico salvato come 'tempi_grafico.png'\n";
+
+    return 0;
 
 
 
