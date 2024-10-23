@@ -597,8 +597,13 @@ int main(int argc, char* argv[]) {
     int h = atoi(argv[3]); // Used to calculate the array size increments
     int divider_for_avg = atoi(argv[4]); // Number of runs to average the time
 
-    executeCutoff(max_possible_size, max_possible_cutoff, h, divider_for_avg);
-    executeCutoffSizes(max_possible_size, max_possible_cutoff, h, divider_for_avg);
+    //This is the code that generates graphs
+    //executeCutoff(max_possible_size, max_possible_cutoff, h, divider_for_avg);
+    //executeCutoffSizes(max_possible_size, max_possible_cutoff, h, divider_for_avg);
+    int optimal_cutoff = 3;
+    double serial_time = serial(max_possible_size);
+    double parallel_time = parallel(max_possible_size, optimal_cutoff);
+    std::cout << "Speedup achieved with optimal cutoff and array size="<<max_possible_size<< ": " << serial_time / parallel_time << std::endl;
 
     return 0;
 }

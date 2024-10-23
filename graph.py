@@ -37,5 +37,6 @@ ax.set_title('3D Plot of Speedup (Serial Time / Parallel Time)')
 # Aggiungere la barra dei colori per lo speedup
 fig.colorbar(surf_speedup, ax=ax, shrink=0.5, aspect=5, label="Speedup")
 
+ax.view_init(azim=240)
 # Mostrare il grafico
 plt.savefig('plot_3d_cutoff.png', format='png', dpi=300)
